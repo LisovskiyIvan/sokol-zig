@@ -2192,6 +2192,7 @@ pub const max_portable_color_attachments = 4;
 pub const max_portable_texture_bindings_per_stage = 16;
 pub const max_portable_storagebuffer_bindings_per_stage = 8;
 pub const max_portable_storageimage_bindings_per_stage = 4;
+pub const max_gpu_timing_scopes = 16;
 
 /// sg_color
 ///
@@ -5528,58 +5529,114 @@ pub fn commit() void {
     sg_commit();
 }
 
-///  AGATE GPU TIMINGS (agate fork patch):
-/// // frame-level GPU execution time for the Metal backend, off by default.
-/// // sg_agate_set_gpu_timing_enabled(true) retains each committed command
-/// // buffer; sg_agate_query_gpu_frame_ms() returns the last COMPLETED frame's
-/// // (GPUEndTime-GPUStartTime) in ms, or -1 when unavailable/not ready yet.
-/// // Non-Metal backends always return -1. Trace hooks (SOKOL_TRACE_HOOKS) are
-/// // unrelated: they are CPU-side begin/end callbacks, not GPU timestamps.
-extern fn sg_agate_set_gpu_timing_enabled(bool) void;
+///  GPU TIMINGS:
+/// // Opt-in GPU execution-time queries, off by default (no timing objects
+/// // exist until enabled). Scopes are caller-defined numbered groups of one
+/// // or more real native render/compute passes (not sokol sg_begin_pass
+/// // itself); ids are [0, SG_MAX_GPU_TIMING_SCOPES). Boundary pairs are
+/// // sequential and non-nested. Backend scope differs, see each query:
+/// // Metal frame = full command-buffer span (GPUStartTime/GPUEndTime),
+/// // Metal scopes = counter-aggregated first-start to last-end per scope,
+/// // WGPU frame = first to last native-pass timestamp span,
+/// // WGPU scopes = same aggregation per scope,
+/// // GL frame = sum of last-completed per-scope TIME_ELAPSED values,
+/// // GL scopes = last-completed TIME_ELAPSED per scope.
+/// // Timestamps aggregate FIRST start to LAST end per scope. Completed
+/// // samples carry the submission _sg.frame_index; frame queries never mix
+/// // samples from different frames. Queries return -1 (0 for the index
+/// // queries) when disabled, invalid, unsupported or not ready yet; a valid
+/// // 0 ms sample is a real result. Trace hooks are unrelated CPU callbacks,
+/// // not GPU timestamps.
+/// // Getter pairing: each ms query refreshes exactly once and publishes its
+/// // (ms, index) pair; each index getter returns the tag of the LAST ms
+/// // query verbatim and never polls the GPU itself, so a paired ms/index
+/// // call set can't straddle an async completion. Query ms first, then read
+/// // its index. A scope bracket with no native passes inside measures
+/// // nothing: Metal/WGPU report -1 (never a fabricated 0), while a GL
+/// // bracket always issues a real query (which may read a valid 0).
+/// // WGPU callbacks run on the host event pump, never interleaved inside a
+/// // synchronous C call pair: keep pumps on the context thread and don't
+/// // pump between a paired ms/index call set.
+extern fn sg_set_gpu_timing_enabled(bool) void;
 
-///  AGATE GPU TIMINGS (agate fork patch):
-/// // frame-level GPU execution time for the Metal backend, off by default.
-/// // sg_agate_set_gpu_timing_enabled(true) retains each committed command
-/// // buffer; sg_agate_query_gpu_frame_ms() returns the last COMPLETED frame's
-/// // (GPUEndTime-GPUStartTime) in ms, or -1 when unavailable/not ready yet.
-/// // Non-Metal backends always return -1. Trace hooks (SOKOL_TRACE_HOOKS) are
-/// // unrelated: they are CPU-side begin/end callbacks, not GPU timestamps.
-pub fn agateSetGpuTimingEnabled(enabled: bool) void {
-    sg_agate_set_gpu_timing_enabled(enabled);
+///  GPU TIMINGS:
+/// // Opt-in GPU execution-time queries, off by default (no timing objects
+/// // exist until enabled). Scopes are caller-defined numbered groups of one
+/// // or more real native render/compute passes (not sokol sg_begin_pass
+/// // itself); ids are [0, SG_MAX_GPU_TIMING_SCOPES). Boundary pairs are
+/// // sequential and non-nested. Backend scope differs, see each query:
+/// // Metal frame = full command-buffer span (GPUStartTime/GPUEndTime),
+/// // Metal scopes = counter-aggregated first-start to last-end per scope,
+/// // WGPU frame = first to last native-pass timestamp span,
+/// // WGPU scopes = same aggregation per scope,
+/// // GL frame = sum of last-completed per-scope TIME_ELAPSED values,
+/// // GL scopes = last-completed TIME_ELAPSED per scope.
+/// // Timestamps aggregate FIRST start to LAST end per scope. Completed
+/// // samples carry the submission _sg.frame_index; frame queries never mix
+/// // samples from different frames. Queries return -1 (0 for the index
+/// // queries) when disabled, invalid, unsupported or not ready yet; a valid
+/// // 0 ms sample is a real result. Trace hooks are unrelated CPU callbacks,
+/// // not GPU timestamps.
+/// // Getter pairing: each ms query refreshes exactly once and publishes its
+/// // (ms, index) pair; each index getter returns the tag of the LAST ms
+/// // query verbatim and never polls the GPU itself, so a paired ms/index
+/// // call set can't straddle an async completion. Query ms first, then read
+/// // its index. A scope bracket with no native passes inside measures
+/// // nothing: Metal/WGPU report -1 (never a fabricated 0), while a GL
+/// // bracket always issues a real query (which may read a valid 0).
+/// // WGPU callbacks run on the host event pump, never interleaved inside a
+/// // synchronous C call pair: keep pumps on the context thread and don't
+/// // pump between a paired ms/index call set.
+pub fn setGpuTimingEnabled(enabled: bool) void {
+    sg_set_gpu_timing_enabled(enabled);
 }
 
-extern fn sg_agate_query_gpu_frame_ms() f32;
+extern fn sg_gpu_frame_timing_supported() bool;
 
-pub fn agateQueryGpuFrameMs() f32 {
-    return sg_agate_query_gpu_frame_ms();
+pub fn gpuFrameTimingSupported() bool {
+    return sg_gpu_frame_timing_supported();
 }
 
-///  AGATE GPU TIMINGS v2 (per-pass timers):
-/// // engine-driven phase timers. Pass ids: 0=shadow, 1=main, 2=post.
-/// // The engine brackets each phase with pass_begin/end; query returns the
-/// // last COMPLETED sample in ms, or -1 when unavailable (disabled, not
-/// // ready yet, Metal/unsupported backend, or an invalid pass id).
-extern fn sg_agate_gpu_pass_begin(i32) void;
+extern fn sg_gpu_scope_timing_supported() bool;
 
-///  AGATE GPU TIMINGS v2 (per-pass timers):
-/// // engine-driven phase timers. Pass ids: 0=shadow, 1=main, 2=post.
-/// // The engine brackets each phase with pass_begin/end; query returns the
-/// // last COMPLETED sample in ms, or -1 when unavailable (disabled, not
-/// // ready yet, Metal/unsupported backend, or an invalid pass id).
-pub fn agateGpuPassBegin(pass: i32) void {
-    sg_agate_gpu_pass_begin(pass);
+pub fn gpuScopeTimingSupported() bool {
+    return sg_gpu_scope_timing_supported();
 }
 
-extern fn sg_agate_gpu_pass_end(i32) void;
+extern fn sg_gpu_timing_scope_begin(i32) void;
 
-pub fn agateGpuPassEnd(pass: i32) void {
-    sg_agate_gpu_pass_end(pass);
+pub fn gpuTimingScopeBegin(scope: i32) void {
+    sg_gpu_timing_scope_begin(scope);
 }
 
-extern fn sg_agate_query_gpu_pass_ms(i32) f32;
+extern fn sg_gpu_timing_scope_end(i32) void;
 
-pub fn agateQueryGpuPassMs(pass: i32) f32 {
-    return sg_agate_query_gpu_pass_ms(pass);
+pub fn gpuTimingScopeEnd(scope: i32) void {
+    sg_gpu_timing_scope_end(scope);
+}
+
+extern fn sg_query_gpu_frame_ms() f32;
+
+pub fn queryGpuFrameMs() f32 {
+    return sg_query_gpu_frame_ms();
+}
+
+extern fn sg_query_gpu_scope_ms(i32) f32;
+
+pub fn queryGpuScopeMs(scope: i32) f32 {
+    return sg_query_gpu_scope_ms(scope);
+}
+
+extern fn sg_query_gpu_frame_index() u32;
+
+pub fn queryGpuFrameIndex() u32 {
+    return sg_query_gpu_frame_index();
+}
+
+extern fn sg_query_gpu_scope_frame_index(i32) u32;
+
+pub fn queryGpuScopeFrameIndex(scope: i32) u32 {
+    return sg_query_gpu_scope_frame_index(scope);
 }
 
 /// resource update functions (wip new resource update api)

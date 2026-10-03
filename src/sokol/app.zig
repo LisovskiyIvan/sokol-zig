@@ -1992,6 +1992,7 @@ pub const Desc = extern struct {
     srgb: bool = false,
     hdr: bool = false,
     disable_vsync: bool = false,
+    wgpu_gpu_timing_enabled: bool = false,
     high_dpi: bool = false,
     fullscreen: bool = false,
     window_title: [*c]const u8 = null,
