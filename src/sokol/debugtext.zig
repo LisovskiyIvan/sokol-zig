@@ -692,16 +692,16 @@ pub fn makeContext(desc: ContextDesc) Context {
     return sdtx_make_context(&desc);
 }
 
-extern fn sdtx_destroy_context(Context) void;
+extern fn sdtx_destroy_context(u32) void;
 
 pub fn destroyContext(ctx: Context) void {
-    sdtx_destroy_context(ctx);
+    sdtx_destroy_context(ctx.id);
 }
 
-extern fn sdtx_set_context(Context) void;
+extern fn sdtx_set_context(u32) void;
 
 pub fn setContext(ctx: Context) void {
-    sdtx_set_context(ctx);
+    sdtx_set_context(ctx.id);
 }
 
 extern fn sdtx_get_context() Context;
@@ -724,10 +724,10 @@ pub fn draw() void {
     sdtx_draw();
 }
 
-extern fn sdtx_context_draw(Context) void;
+extern fn sdtx_context_draw(u32) void;
 
 pub fn contextDraw(ctx: Context) void {
-    sdtx_context_draw(ctx);
+    sdtx_context_draw(ctx.id);
 }
 
 extern fn sdtx_draw_layer(i32) void;
@@ -736,10 +736,10 @@ pub fn drawLayer(layer_id: i32) void {
     sdtx_draw_layer(layer_id);
 }
 
-extern fn sdtx_context_draw_layer(Context, i32) void;
+extern fn sdtx_context_draw_layer(u32, i32) void;
 
 pub fn contextDrawLayer(ctx: Context, layer_id: i32) void {
-    sdtx_context_draw_layer(ctx, layer_id);
+    sdtx_context_draw_layer(ctx.id, layer_id);
 }
 
 /// switch render layer

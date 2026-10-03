@@ -368,122 +368,122 @@ pub fn makeCmdbuf(desc: CmdbufDesc) Cmdbuf {
 }
 
 /// destroy cmdbuf object
-extern fn scb_destroy_cmdbuf(Cmdbuf) void;
+extern fn scb_destroy_cmdbuf(u32) void;
 
 /// destroy cmdbuf object
 pub fn destroyCmdbuf(cb: Cmdbuf) void {
-    scb_destroy_cmdbuf(cb);
+    scb_destroy_cmdbuf(cb.id);
 }
 
 /// submit command buffer to sokol-gfx and rewind the command buffer (call inside a sokol-gfx pass)
-extern fn scb_submit(Cmdbuf) void;
+extern fn scb_submit(u32) void;
 
 /// submit command buffer to sokol-gfx and rewind the command buffer (call inside a sokol-gfx pass)
 pub fn submit(cb: Cmdbuf) void {
-    scb_submit(cb);
+    scb_submit(cb.id);
 }
 
 /// reset a recorded command buffer, discarding its content
-extern fn scb_reset(Cmdbuf) void;
+extern fn scb_reset(u32) void;
 
 /// reset a recorded command buffer, discarding its content
 pub fn reset(cb: Cmdbuf) void {
-    scb_reset(cb);
+    scb_reset(cb.id);
 }
 
 /// record apply-viewport command (integer variant)
-extern fn scb_apply_viewport(Cmdbuf, i32, i32, i32, i32, bool) void;
+extern fn scb_apply_viewport(u32, i32, i32, i32, i32, bool) void;
 
 /// record apply-viewport command (integer variant)
 pub fn applyViewport(cb: Cmdbuf, x: i32, y: i32, width: i32, height: i32, origin_top_left: bool) void {
-    scb_apply_viewport(cb, x, y, width, height, origin_top_left);
+    scb_apply_viewport(cb.id, x, y, width, height, origin_top_left);
 }
 
 /// record apply-viewport command (float variant)
-extern fn scb_apply_viewportf(Cmdbuf, f32, f32, f32, f32, bool) void;
+extern fn scb_apply_viewportf(u32, f32, f32, f32, f32, bool) void;
 
 /// record apply-viewport command (float variant)
 pub fn applyViewportf(cb: Cmdbuf, x: f32, y: f32, width: f32, height: f32, origin_top_left: bool) void {
-    scb_apply_viewportf(cb, x, y, width, height, origin_top_left);
+    scb_apply_viewportf(cb.id, x, y, width, height, origin_top_left);
 }
 
 /// record apply-scissor-rect command (integer variant)
-extern fn scb_apply_scissor_rect(Cmdbuf, i32, i32, i32, i32, bool) void;
+extern fn scb_apply_scissor_rect(u32, i32, i32, i32, i32, bool) void;
 
 /// record apply-scissor-rect command (integer variant)
 pub fn applyScissorRect(cb: Cmdbuf, x: i32, y: i32, width: i32, height: i32, origin_top_left: bool) void {
-    scb_apply_scissor_rect(cb, x, y, width, height, origin_top_left);
+    scb_apply_scissor_rect(cb.id, x, y, width, height, origin_top_left);
 }
 
 /// record apply-scissor-rect command (float variant)
-extern fn scb_apply_scissor_rectf(Cmdbuf, f32, f32, f32, f32, bool) void;
+extern fn scb_apply_scissor_rectf(u32, f32, f32, f32, f32, bool) void;
 
 /// record apply-scissor-rect command (float variant)
 pub fn applyScissorRectf(cb: Cmdbuf, x: f32, y: f32, width: f32, height: f32, origin_top_left: bool) void {
-    scb_apply_scissor_rectf(cb, x, y, width, height, origin_top_left);
+    scb_apply_scissor_rectf(cb.id, x, y, width, height, origin_top_left);
 }
 
 /// record apply pipeline command
-extern fn scb_apply_pipeline(Cmdbuf, sg.Pipeline) void;
+extern fn scb_apply_pipeline(u32, u32) void;
 
 /// record apply pipeline command
 pub fn applyPipeline(cb: Cmdbuf, pip: sg.Pipeline) void {
-    scb_apply_pipeline(cb, pip);
+    scb_apply_pipeline(cb.id, pip.id);
 }
 
 /// record apply bindings command
-extern fn scb_apply_bindings(Cmdbuf, [*c]const sg.Bindings) void;
+extern fn scb_apply_bindings(u32, [*c]const sg.Bindings) void;
 
 /// record apply bindings command
 pub fn applyBindings(cb: Cmdbuf, bindings: sg.Bindings) void {
-    scb_apply_bindings(cb, &bindings);
+    scb_apply_bindings(cb.id, &bindings);
 }
 
 /// record apply uniforms command
-extern fn scb_apply_uniforms(Cmdbuf, i32, [*c]const sg.Range) void;
+extern fn scb_apply_uniforms(u32, i32, [*c]const sg.Range) void;
 
 /// record apply uniforms command
 pub fn applyUniforms(cb: Cmdbuf, ub_slot: i32, data: sg.Range) void {
-    scb_apply_uniforms(cb, ub_slot, &data);
+    scb_apply_uniforms(cb.id, ub_slot, &data);
 }
 
 /// record draw command
-extern fn scb_draw(Cmdbuf, i32, i32, i32) void;
+extern fn scb_draw(u32, i32, i32, i32) void;
 
 /// record draw command
 pub fn draw(cb: Cmdbuf, base_element: i32, num_elements: i32, num_instances: i32) void {
-    scb_draw(cb, base_element, num_elements, num_instances);
+    scb_draw(cb.id, base_element, num_elements, num_instances);
 }
 
 /// record draw-ex command
-extern fn scb_draw_ex(Cmdbuf, i32, i32, i32, i32, i32) void;
+extern fn scb_draw_ex(u32, i32, i32, i32, i32, i32) void;
 
 /// record draw-ex command
 pub fn drawEx(cb: Cmdbuf, base_element: i32, num_elements: i32, num_instances: i32, base_vertex: i32, base_instance: i32) void {
-    scb_draw_ex(cb, base_element, num_elements, num_instances, base_vertex, base_instance);
+    scb_draw_ex(cb.id, base_element, num_elements, num_instances, base_vertex, base_instance);
 }
 
 /// record dispatch command
-extern fn scb_dispatch(Cmdbuf, i32, i32, i32) void;
+extern fn scb_dispatch(u32, i32, i32, i32) void;
 
 /// record dispatch command
 pub fn dispatch(cb: Cmdbuf, num_groups_x: i32, num_groups_y: i32, num_groups_z: i32) void {
-    scb_dispatch(cb, num_groups_x, num_groups_y, num_groups_z);
+    scb_dispatch(cb.id, num_groups_x, num_groups_y, num_groups_z);
 }
 
 /// query command buffer resource state (valid, failed, invalid)
-extern fn scb_query_cmdbuf_state(Cmdbuf) ResourceState;
+extern fn scb_query_cmdbuf_state(u32) ResourceState;
 
 /// query command buffer resource state (valid, failed, invalid)
 pub fn queryCmdbufState(cb: Cmdbuf) ResourceState {
-    return scb_query_cmdbuf_state(cb);
+    return scb_query_cmdbuf_state(cb.id);
 }
 
 /// query current command buffer properties
-extern fn scb_query_cmdbuf_info(Cmdbuf) CmdbufInfo;
+extern fn scb_query_cmdbuf_info(u32) CmdbufInfo;
 
 /// query current command buffer properties
 pub fn queryCmdbufInfo(cb: Cmdbuf) CmdbufInfo {
-    return scb_query_cmdbuf_info(cb);
+    return scb_query_cmdbuf_info(cb.id);
 }
 
