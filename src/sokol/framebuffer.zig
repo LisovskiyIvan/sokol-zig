@@ -492,66 +492,66 @@ pub fn makeFramebuffer(desc: FramebufferDesc) Framebuffer {
 }
 
 /// destroy framebuffer object
-extern fn sfb_destroy_framebuffer(Framebuffer) void;
+extern fn sfb_destroy_framebuffer(u32) void;
 
 /// destroy framebuffer object
 pub fn destroyFramebuffer(fb: Framebuffer) void {
-    sfb_destroy_framebuffer(fb);
+    sfb_destroy_framebuffer(fb.id);
 }
 
 /// resize internal images (no-op if resize isn't needed), return true when images had to be re-created
-extern fn sfb_resize(Framebuffer, [*c]const ResizeDesc) bool;
+extern fn sfb_resize(u32, [*c]const ResizeDesc) bool;
 
 /// resize internal images (no-op if resize isn't needed), return true when images had to be re-created
 pub fn resize(fb: Framebuffer, desc: ResizeDesc) bool {
-    return sfb_resize(fb, &desc);
+    return sfb_resize(fb.id, &desc);
 }
 
 /// update framebuffer and/or color palette content (must be called outside any sokol-gfx pass)
-extern fn sfb_update(Framebuffer, [*c]const UpdateDesc) void;
+extern fn sfb_update(u32, [*c]const UpdateDesc) void;
 
 /// update framebuffer and/or color palette content (must be called outside any sokol-gfx pass)
 pub fn update(fb: Framebuffer, desc: UpdateDesc) void {
-    sfb_update(fb, &desc);
+    sfb_update(fb.id, &desc);
 }
 
 /// draw framebuffer content with default shader (must be called inside a sokol-gfx render pass)
-extern fn sfb_render(Framebuffer) void;
+extern fn sfb_render(u32) void;
 
 /// draw framebuffer content with default shader (must be called inside a sokol-gfx render pass)
 pub fn render(fb: Framebuffer) void {
-    sfb_render(fb);
+    sfb_render(fb.id);
 }
 
 /// draw framebuffer content with injected shader (must be called inside a sokol-gfx render pass)
-extern fn sfb_render_ex(Framebuffer, [*c]const RenderDesc) void;
+extern fn sfb_render_ex(u32, [*c]const RenderDesc) void;
 
 /// draw framebuffer content with injected shader (must be called inside a sokol-gfx render pass)
 pub fn renderEx(fb: Framebuffer, desc: RenderDesc) void {
-    sfb_render_ex(fb, &desc);
+    sfb_render_ex(fb.id, &desc);
 }
 
 /// query framebuffer resource state (valid or failed)
-extern fn sfb_query_framebuffer_state(Framebuffer) ResourceState;
+extern fn sfb_query_framebuffer_state(u32) ResourceState;
 
 /// query framebuffer resource state (valid or failed)
 pub fn queryFramebufferState(fb: Framebuffer) ResourceState {
-    return sfb_query_framebuffer_state(fb);
+    return sfb_query_framebuffer_state(fb.id);
 }
 
 /// query current framebuffer properties
-extern fn sfb_query_framebuffer_info(Framebuffer) FramebufferInfo;
+extern fn sfb_query_framebuffer_info(u32) FramebufferInfo;
 
 /// query current framebuffer properties
 pub fn queryFramebufferInfo(fb: Framebuffer) FramebufferInfo {
-    return sfb_query_framebuffer_info(fb);
+    return sfb_query_framebuffer_info(fb.id);
 }
 
 /// query the framebuffer desc, with default values patched in
-extern fn sfb_query_framebuffer_desc(Framebuffer) FramebufferDesc;
+extern fn sfb_query_framebuffer_desc(u32) FramebufferDesc;
 
 /// query the framebuffer desc, with default values patched in
 pub fn queryFramebufferDesc(fb: Framebuffer) FramebufferDesc {
-    return sfb_query_framebuffer_desc(fb);
+    return sfb_query_framebuffer_desc(fb.id);
 }
 

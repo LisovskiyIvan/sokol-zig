@@ -468,16 +468,16 @@ pub fn draw() void {
     simgui_draw();
 }
 
-extern fn simgui_imtextureid(sg.View) u64;
+extern fn simgui_imtextureid(u32) u64;
 
 pub fn imtextureid(tex_view: sg.View) u64 {
-    return simgui_imtextureid(tex_view);
+    return simgui_imtextureid(tex_view.id);
 }
 
-extern fn simgui_imtextureid_with_sampler(sg.View, sg.Sampler) u64;
+extern fn simgui_imtextureid_with_sampler(u32, u32) u64;
 
 pub fn imtextureidWithSampler(tex_view: sg.View, smp: sg.Sampler) u64 {
-    return simgui_imtextureid_with_sampler(tex_view, smp);
+    return simgui_imtextureid_with_sampler(tex_view.id, smp.id);
 }
 
 extern fn simgui_texture_view_from_imtextureid(u64) sg.View;

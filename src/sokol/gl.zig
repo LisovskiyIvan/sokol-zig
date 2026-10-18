@@ -812,10 +812,10 @@ pub fn getError() Error {
     return sgl_error();
 }
 
-extern fn sgl_context_error(Context) Error;
+extern fn sgl_context_error(u32) Error;
 
 pub fn contextError(ctx: Context) Error {
-    return sgl_context_error(ctx);
+    return sgl_context_error(ctx.id);
 }
 
 /// context functions
@@ -826,16 +826,16 @@ pub fn makeContext(desc: ContextDesc) Context {
     return sgl_make_context(&desc);
 }
 
-extern fn sgl_destroy_context(Context) void;
+extern fn sgl_destroy_context(u32) void;
 
 pub fn destroyContext(ctx: Context) void {
-    sgl_destroy_context(ctx);
+    sgl_destroy_context(ctx.id);
 }
 
-extern fn sgl_set_context(Context) void;
+extern fn sgl_set_context(u32) void;
 
 pub fn setContext(ctx: Context) void {
-    sgl_set_context(ctx);
+    sgl_set_context(ctx.id);
 }
 
 extern fn sgl_get_context() Context;
@@ -872,10 +872,10 @@ pub fn draw() void {
     sgl_draw();
 }
 
-extern fn sgl_context_draw(Context) void;
+extern fn sgl_context_draw(u32) void;
 
 pub fn contextDraw(ctx: Context) void {
-    sgl_context_draw(ctx);
+    sgl_context_draw(ctx.id);
 }
 
 extern fn sgl_draw_layer(i32) void;
@@ -884,10 +884,10 @@ pub fn drawLayer(layer_id: i32) void {
     sgl_draw_layer(layer_id);
 }
 
-extern fn sgl_context_draw_layer(Context, i32) void;
+extern fn sgl_context_draw_layer(u32, i32) void;
 
 pub fn contextDrawLayer(ctx: Context, layer_id: i32) void {
-    sgl_context_draw_layer(ctx, layer_id);
+    sgl_context_draw_layer(ctx.id, layer_id);
 }
 
 /// create and destroy pipeline objects
@@ -898,16 +898,16 @@ pub fn makePipeline(desc: sg.PipelineDesc) Pipeline {
     return sgl_make_pipeline(&desc);
 }
 
-extern fn sgl_context_make_pipeline(Context, [*c]const sg.PipelineDesc) Pipeline;
+extern fn sgl_context_make_pipeline(u32, [*c]const sg.PipelineDesc) Pipeline;
 
 pub fn contextMakePipeline(ctx: Context, desc: sg.PipelineDesc) Pipeline {
-    return sgl_context_make_pipeline(ctx, &desc);
+    return sgl_context_make_pipeline(ctx.id, &desc);
 }
 
-extern fn sgl_destroy_pipeline(Pipeline) void;
+extern fn sgl_destroy_pipeline(u32) void;
 
 pub fn destroyPipeline(pip: Pipeline) void {
-    sgl_destroy_pipeline(pip);
+    sgl_destroy_pipeline(pip.id);
 }
 
 /// render state functions
@@ -954,10 +954,10 @@ pub fn disableTexture() void {
     sgl_disable_texture();
 }
 
-extern fn sgl_texture(sg.View, sg.Sampler) void;
+extern fn sgl_texture(u32, u32) void;
 
 pub fn texture(tex_view: sg.View, smp: sg.Sampler) void {
-    sgl_texture(tex_view, smp);
+    sgl_texture(tex_view.id, smp.id);
 }
 
 extern fn sgl_layer(i32) void;
@@ -974,10 +974,10 @@ pub fn loadDefaultPipeline() void {
     sgl_load_default_pipeline();
 }
 
-extern fn sgl_load_pipeline(Pipeline) void;
+extern fn sgl_load_pipeline(u32) void;
 
 pub fn loadPipeline(pip: Pipeline) void {
-    sgl_load_pipeline(pip);
+    sgl_load_pipeline(pip.id);
 }
 
 extern fn sgl_push_pipeline() void;
