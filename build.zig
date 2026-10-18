@@ -395,8 +395,7 @@ pub const EmLinkOptions = struct {
 };
 pub fn emLinkStep(b: *Build, options: EmLinkOptions) !*Build.Step.InstallDir {
     const emcc_path = emTool(b, options.emsdk, "emcc");
-    const emcc = addRunFile(b, emcc_path);
-    setupEmToolEnv(b, options.emsdk, emcc);
+    const emcc = emToolRun(b, options.emsdk, emcc_path);
     emcc.setName("emcc"); // hide emcc path
     if (isOptimizeModeDebug(options.optimize)) {
         emcc.addArgs(&.{ "-g", "-Og", "-sSAFE_HEAP=1", "-sSTACK_OVERFLOW_CHECK=1" });
@@ -469,8 +468,7 @@ pub const EmRunOptions = struct {
 };
 pub fn emRunStep(b: *Build, options: EmRunOptions) *Build.Step.Run {
     const emrun_path = emTool(b, options.emsdk, "emrun");
-    const emrun = addRunFile(b, emrun_path);
-    setupEmToolEnv(b, options.emsdk, emrun);
+    const emrun = emToolRun(b, options.emsdk, emrun_path);
     emrun.addFileArg(b.path(b.fmt("zig-out/web/{s}.html", .{options.name})));
     return emrun;
 }
@@ -485,8 +483,7 @@ pub const EmBuilderOptions = struct {
 };
 pub fn emBuilderStep(b: *Build, options: EmBuilderOptions) *Build.Step.Run {
     const embuilder_path = emTool(b, options.emsdk, "embuilder");
-    const embuilder = addRunFile(b, embuilder_path);
-    setupEmToolEnv(b, options.emsdk, embuilder);
+    const embuilder = emToolRun(b, options.emsdk, embuilder_path);
     if (options.lto) {
         embuilder.addArg("--lto");
     }
@@ -515,6 +512,40 @@ fn setupEmToolEnv(b: *Build, emsdk: *Build.Dependency, run: *Build.Step.Run) voi
     }
 }
 
+/// Zig 0.16.0 vs 0.17.0+ compatibility helper: creates a Run step that
+/// executes an emsdk tool with the EMSDK / EMSDK_PYTHON / EMSDK_NODE
+/// environment wired up.
+///
+/// On 0.16 dependency LazyPaths still resolve to strings at configure time
+/// (`getPath`), so plain `setEnvironmentVariable` works. Zig 0.17 split the
+/// build into a configurer and a maker process, and the configurer is no
+/// longer allowed to resolve paths out of the graph (`getPath` was removed),
+/// so environment variables that must carry emsdk dependency paths become
+/// `env KEY=PATH` argv assignments handled by POSIX env(1) instead. Web
+/// builds under 0.17+ are therefore POSIX-only; the Windows branch of
+/// `createEmsdkStep` keeps the 0.16 code path.
+fn emToolRun(b: *Build, emsdk: *Build.Dependency, tool: Build.LazyPath) *Build.Step.Run {
+    if (builtin.zig_version.minor <= 16) {
+        const run = addRunFile(b, tool);
+        setupEmToolEnv(b, emsdk, run);
+        return run;
+    }
+    const run = b.addSystemCommand(&.{"env"});
+    run.addDirectoryArg2(emsdk.path("."), .{ .prefix = "EMSDK=" });
+    if (b.graph.environ_map.get("EMSDK_PYTHON")) |p| {
+        run.addArg(b.fmt("EMSDK_PYTHON={s}", .{p}));
+    } else {
+        run.addFileArg2(emsdk.path("python/3.13.3_64bit/bin/python3"), .{ .prefix = "EMSDK_PYTHON=" });
+    }
+    if (b.graph.environ_map.get("EMSDK_NODE")) |n| {
+        run.addArg(b.fmt("EMSDK_NODE={s}", .{n}));
+    } else {
+        run.addFileArg2(emsdk.path("node/22.16.0_64bit/bin/node"), .{ .prefix = "EMSDK_NODE=" });
+    }
+    run.addFileArg(tool);
+    return run;
+}
+
 // helper function to build a LazyPath from the emsdk root and provided path components
 fn emSdkLazyPath(b: *Build, emsdk: *Build.Dependency, sub_paths: []const []const u8) Build.LazyPath {
     return emsdk.path(b.pathJoin(sub_paths));
@@ -527,16 +558,40 @@ pub fn emTool(b: *Build, emsdk: *Build.Dependency, tool: []const u8) Build.LazyP
 }
 
 fn createEmsdkStep(b: *Build, emsdk: *Build.Dependency) *Build.Step.Run {
-    if (builtin.os.tag == .windows) {
-        const step = addRunFile(b, emSdkLazyPath(b, emsdk, &.{"emsdk.bat"}));
-        setupEmToolEnv(b, emsdk, step);
-        return step;
-    } else {
-        const step = b.addSystemCommand(&.{"bash"});
-        step.addFileArg(emSdkLazyPath(b, emsdk, &.{"emsdk"}));
-        setupEmToolEnv(b, emsdk, step);
-        return step;
+    if (builtin.zig_version.minor <= 16) {
+        if (builtin.os.tag == .windows) {
+            const step = addRunFile(b, emSdkLazyPath(b, emsdk, &.{"emsdk.bat"}));
+            setupEmToolEnv(b, emsdk, step);
+            return step;
+        } else {
+            const step = b.addSystemCommand(&.{"bash"});
+            step.addFileArg(emSdkLazyPath(b, emsdk, &.{"emsdk"}));
+            setupEmToolEnv(b, emsdk, step);
+            return step;
+        }
     }
+    // Zig 0.17+: same commands, but the emsdk dependency paths that must
+    // reach the scripts as environment are `env KEY=PATH` argv assignments
+    // (see emToolRun). POSIX only; the 0.16 branch above keeps Windows.
+    const step = b.addSystemCommand(&.{"env"});
+    step.addDirectoryArg2(emsdk.path("."), .{ .prefix = "EMSDK=" });
+    if (b.graph.environ_map.get("EMSDK_PYTHON")) |p| {
+        step.addArg(b.fmt("EMSDK_PYTHON={s}", .{p}));
+    } else {
+        step.addFileArg2(emsdk.path("python/3.13.3_64bit/bin/python3"), .{ .prefix = "EMSDK_PYTHON=" });
+    }
+    if (b.graph.environ_map.get("EMSDK_NODE")) |n| {
+        step.addArg(b.fmt("EMSDK_NODE={s}", .{n}));
+    } else {
+        step.addFileArg2(emsdk.path("node/22.16.0_64bit/bin/node"), .{ .prefix = "EMSDK_NODE=" });
+    }
+    if (builtin.os.tag == .windows) {
+        step.addFileArg(emSdkLazyPath(b, emsdk, &.{"emsdk.bat"}));
+    } else {
+        step.addArgs(&.{"bash"});
+        step.addFileArg(emSdkLazyPath(b, emsdk, &.{"emsdk"}));
+    }
+    return step;
 }
 
 // helper function for creating a build step to install the Emscripten SDK
