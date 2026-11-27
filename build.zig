@@ -179,28 +179,39 @@ pub fn buildLibSokol(b: *Build, options: LibSokolOptions) !*Build.Step.Compile {
         .root_module = mod,
     });
     if (isPlatform(mod_target, .web)) {
-        const emsdk = options.emsdk orelse {
-            std.log.err("Must provide emsdk dependency when building for web (LibSokolOptions.emsdk)", .{});
-            return error.EmscriptenSdkDepenencyExpected;
-        };
         // make sure we're building for the wasm32-emscripten target, not wasm32-freestanding
         if (mod_target.os.tag != .emscripten) {
             std.log.err("Please build with 'zig build -Dtarget=wasm32-emscripten", .{});
             return error.TargetWasm32EmscriptenExpected;
         }
-        // for WebGPU, need to run embuilder for `emdawnwebgpu` after emsdk setup and before C library build
-        if (options.backend == .wgpu) {
-            const embuilder_step = emBuilderStep(b, .{
-                .port_name = "emdawnwebgpu",
-                .emsdk = emsdk,
-            });
-            lib.step.dependOn(&embuilder_step.step);
-            // need to add include path to find emdawnwebgpu <webgpu/webgpu.h> before Emscripten SDK webgpu.h
-            mod.addSystemIncludePath(emSdkLazyPath(b, emsdk, &.{ "upstream", "emscripten", "cache", "ports", "emdawnwebgpu", "emdawnwebgpu_pkg", "webgpu", "include" }));
-        }
+        if (systemEmscriptenRoot(b)) |root| {
+            // Existing Emscripten installation (SOKOL_EMSCRIPTEN_ROOT): use its
+            // sysroot and ports directly, no emsdk checkout/activation needed.
+            if (options.backend == .wgpu) {
+                const embuilder_step = systemEmBuilderStep(b, root, "emdawnwebgpu");
+                lib.step.dependOn(&embuilder_step.step);
+                mod.addSystemIncludePath(emscriptenRootPath(b, root, "cache/ports/emdawnwebgpu/emdawnwebgpu_pkg/webgpu/include"));
+            }
+            mod.addSystemIncludePath(emscriptenRootPath(b, root, "cache/sysroot/include"));
+        } else {
+            const emsdk = options.emsdk orelse {
+                std.log.err("Must provide emsdk dependency when building for web (LibSokolOptions.emsdk), or set SOKOL_EMSCRIPTEN_ROOT to an existing Emscripten installation", .{});
+                return error.EmscriptenSdkDepenencyExpected;
+            };
+            // for WebGPU, need to run embuilder for `emdawnwebgpu` after emsdk setup and before C library build
+            if (options.backend == .wgpu) {
+                const embuilder_step = emBuilderStep(b, .{
+                    .port_name = "emdawnwebgpu",
+                    .emsdk = emsdk,
+                });
+                lib.step.dependOn(&embuilder_step.step);
+                // need to add include path to find emdawnwebgpu <webgpu/webgpu.h> before Emscripten SDK webgpu.h
+                mod.addSystemIncludePath(emSdkLazyPath(b, emsdk, &.{ "upstream", "emscripten", "cache", "ports", "emdawnwebgpu", "emdawnwebgpu_pkg", "webgpu", "include" }));
+            }
 
-        // add the Emscripten system include seach path
-        mod.addSystemIncludePath(emSdkLazyPath(b, emsdk, &.{ "upstream", "emscripten", "cache", "sysroot", "include" }));
+            // add the Emscripten system include seach path
+            mod.addSystemIncludePath(emSdkLazyPath(b, emsdk, &.{ "upstream", "emscripten", "cache", "sysroot", "include" }));
+        }
     }
 
     // resolve .auto backend into specific backend by platform
@@ -378,6 +389,29 @@ fn isOptimizeModeDebug(opt: ?OptimizeMode) bool {
 
 //== EMSCRIPTEN INTEGRATION ============================================================================================
 
+/// Optional existing Emscripten installation, selected by the
+/// `SOKOL_EMSCRIPTEN_ROOT` environment variable. The root is the directory
+/// that contains `emcc`, `em++`, `embuilder` and `cache/sysroot` (for a
+/// Homebrew install that is `<cellar>/emscripten/<ver>/libexec`). When set,
+/// web builds use it instead of the `emsdk` package dependency, so no SDK
+/// download or activation step is required. Unset keeps the historical emsdk
+/// flow byte-for-byte.
+fn systemEmscriptenRoot(b: *Build) ?[]const u8 {
+    const root = b.graph.environ_map.get("SOKOL_EMSCRIPTEN_ROOT") orelse return null;
+    return if (root.len == 0) null else root;
+}
+
+fn emscriptenRootPath(b: *Build, root: []const u8, sub_path: []const u8) Build.LazyPath {
+    return .{ .cwd_relative = b.pathJoin(&.{ root, sub_path }) };
+}
+
+/// Run `<root>/embuilder build <port>` for a system Emscripten install.
+fn systemEmBuilderStep(b: *Build, root: []const u8, port_name: []const u8) *Build.Step.Run {
+    const embuilder = b.addSystemCommand(&.{b.pathJoin(&.{ root, "embuilder" })});
+    embuilder.addArgs(&.{ "build", port_name });
+    return embuilder;
+}
+
 // for wasm32-emscripten, need to run the Emscripten linker from the Emscripten SDK
 // NOTE: ideally this would go into a separate emsdk-zig package
 pub const EmLinkOptions = struct {
@@ -396,9 +430,19 @@ pub const EmLinkOptions = struct {
     pre_js: []const Build.LazyPath = &.{}, // input files via '--pre-js [file]''
     extra_args: []const []const u8 = &.{}, // general extra cmdline arguments
 };
-pub fn emLinkStep(b: *Build, options: EmLinkOptions) !*Build.Step.InstallDir {
+/// Linker run step: system Emscripten (`SOKOL_EMSCRIPTEN_ROOT`) invokes its
+/// em++/emcc directly; the emsdk dependency keeps the historical emcc call.
+/// WebGPU uses em++ because the emdawnwebgpu port requires C++ linkage.
+fn emLinkerRun(b: *Build, options: EmLinkOptions) *Build.Step.Run {
+    if (systemEmscriptenRoot(b)) |root| {
+        return b.addSystemCommand(&.{b.pathJoin(&.{ root, if (options.use_webgpu) "em++" else "emcc" })});
+    }
     const emcc_path = emTool(b, options.emsdk, "emcc");
-    const emcc = emToolRun(b, options.emsdk, emcc_path);
+    return emToolRun(b, options.emsdk, emcc_path);
+}
+
+pub fn emLinkStep(b: *Build, options: EmLinkOptions) !*Build.Step.InstallDir {
+    const emcc = emLinkerRun(b, options);
     emcc.setName("emcc"); // hide emcc path
     if (isOptimizeModeDebug(options.optimize)) {
         emcc.addArgs(&.{ "-g", "-Og", "-sSAFE_HEAP=1", "-sSTACK_OVERFLOW_CHECK=1" });
@@ -578,15 +622,15 @@ fn createEmsdkStep(b: *Build, emsdk: *Build.Dependency) *Build.Step.Run {
     // (see emToolRun). POSIX only; the 0.16 branch above keeps Windows.
     const step = b.addSystemCommand(&.{"env"});
     step.addDirectoryArg2(emsdk.path("."), .{ .prefix = "EMSDK=" });
+    // A fresh emsdk checkout has no bundled python/node yet; forcing those
+    // paths makes `emsdk install` fail before it can download them (exit 126).
+    // The emsdk wrapper already prefers its bundled python and falls back to
+    // `python3` on PATH, so only pass through explicit user overrides here.
     if (b.graph.environ_map.get("EMSDK_PYTHON")) |p| {
         step.addArg(b.fmt("EMSDK_PYTHON={s}", .{p}));
-    } else {
-        step.addFileArg2(emsdk.path("python/3.13.3_64bit/bin/python3"), .{ .prefix = "EMSDK_PYTHON=" });
     }
     if (b.graph.environ_map.get("EMSDK_NODE")) |n| {
         step.addArg(b.fmt("EMSDK_NODE={s}", .{n}));
-    } else {
-        step.addFileArg2(emsdk.path("node/22.16.0_64bit/bin/node"), .{ .prefix = "EMSDK_NODE=" });
     }
     if (builtin.os.tag == .windows) {
         step.addFileArg(emSdkLazyPath(b, emsdk, &.{"emsdk.bat"}));
