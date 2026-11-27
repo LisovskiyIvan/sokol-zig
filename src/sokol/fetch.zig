@@ -1108,11 +1108,11 @@ pub fn send(request: Request) Handle {
 }
 
 /// return true if a handle is valid *and* the request is alive
-extern fn sfetch_handle_valid(Handle) bool;
+extern fn sfetch_handle_valid(u32) bool;
 
 /// return true if a handle is valid *and* the request is alive
 pub fn handleValid(h: Handle) bool {
-    return sfetch_handle_valid(h);
+    return sfetch_handle_valid(h.id);
 }
 
 /// do per-frame work, moves requests into and out of IO threads, and invokes response-callbacks
@@ -1124,42 +1124,42 @@ pub fn dowork() void {
 }
 
 /// bind a data buffer to a request (request must not currently have a buffer bound, must be called from response callback
-extern fn sfetch_bind_buffer(Handle, Range) void;
+extern fn sfetch_bind_buffer(u32, Range) void;
 
 /// bind a data buffer to a request (request must not currently have a buffer bound, must be called from response callback
 pub fn bindBuffer(h: Handle, buffer: Range) void {
-    sfetch_bind_buffer(h, buffer);
+    sfetch_bind_buffer(h.id, buffer);
 }
 
 /// clear the 'buffer binding' of a request, returns previous buffer pointer (can be 0), must be called from response callback
-extern fn sfetch_unbind_buffer(Handle) ?*anyopaque;
+extern fn sfetch_unbind_buffer(u32) ?*anyopaque;
 
 /// clear the 'buffer binding' of a request, returns previous buffer pointer (can be 0), must be called from response callback
 pub fn unbindBuffer(h: Handle) ?*anyopaque {
-    return sfetch_unbind_buffer(h);
+    return sfetch_unbind_buffer(h.id);
 }
 
 /// cancel a request that's in flight (will call response callback with .cancelled + .finished)
-extern fn sfetch_cancel(Handle) void;
+extern fn sfetch_cancel(u32) void;
 
 /// cancel a request that's in flight (will call response callback with .cancelled + .finished)
 pub fn cancel(h: Handle) void {
-    sfetch_cancel(h);
+    sfetch_cancel(h.id);
 }
 
 /// pause a request (will call response callback each frame with .paused)
-extern fn sfetch_pause(Handle) void;
+extern fn sfetch_pause(u32) void;
 
 /// pause a request (will call response callback each frame with .paused)
 pub fn pause(h: Handle) void {
-    sfetch_pause(h);
+    sfetch_pause(h.id);
 }
 
 /// continue a paused request
-extern fn sfetch_continue(Handle) void;
+extern fn sfetch_continue(u32) void;
 
 /// continue a paused request
 pub fn continueFetching(h: Handle) void {
-    sfetch_continue(h);
+    sfetch_continue(h.id);
 }
 
